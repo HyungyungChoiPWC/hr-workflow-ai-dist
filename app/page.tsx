@@ -2128,16 +2128,18 @@ export default function Home() {
           />
         </div>
 
-        {/* Chat Panel */}
-        <ChatPanel
-          nodes={nodes}
-          edges={edges}
-          onApplyWorkflow={handleApplyWorkflow}
-          isOpen={chatOpen}
-          onToggle={() => setChatOpen(!chatOpen)}
-          processData={chatInitData}
-          onProcessDataConsumed={() => setChatInitData("")}
-        />
+        {/* Chat Panel — 웹 편입판에서만 (로컬 설치판은 백엔드가 없어 AI 챗 비활성) */}
+        {process.env.NEXT_PUBLIC_BASE_PATH && (
+          <ChatPanel
+            nodes={nodes}
+            edges={edges}
+            onApplyWorkflow={handleApplyWorkflow}
+            isOpen={chatOpen}
+            onToggle={() => setChatOpen(!chatOpen)}
+            processData={chatInitData}
+            onProcessDataConsumed={() => setChatInitData("")}
+          />
+        )}
       </div>
 
     </div>
