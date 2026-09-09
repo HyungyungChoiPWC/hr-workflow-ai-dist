@@ -9,8 +9,8 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "As-Is Workflow Builder",
-  description: "As-Is Workflow Builder",
+  title: "프로세스맵 빌더",
+  description: "As-Is · To-Be 업무 흐름도 작성 도구 (AX Lens)",
 };
 
 export default function RootLayout({

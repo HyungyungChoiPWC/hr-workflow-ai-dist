@@ -3087,86 +3087,77 @@ export default function ExportToolbar({
     saveAs(blob, `HR_AllSheets_${Date.now()}.xlsx`);
   }, [sheets, getSheetData, activeSheetId, nodes, edges, csvRows]);
 
+  const hasNodes = nodes.length > 0;
+  const btn = (color: string) =>
+    `text-[11px] font-medium text-white rounded px-2 py-1 transition disabled:opacity-40 disabled:cursor-not-allowed ${color}`;
+  const Sep = () => <div className="w-px h-5 bg-gray-200 hidden sm:block" />;
   return (
     <>
-    <div className="flex gap-1">
-      <button
-        onClick={handleSaveJSON}
-        className="text-[10px] font-medium bg-blue-600 text-white rounded px-2 py-1.5 hover:bg-blue-700 transition"
-        title="JSON 저장"
-      >
-        💾 저장
-      </button>
-      <button
-        onClick={handleLoadJSON}
-        className="text-[10px] font-medium bg-gray-500 text-white rounded px-2 py-1.5 hover:bg-gray-600 transition"
-        title="JSON 불러오기"
-      >
-        📂 불러오기
-      </button>
-      <button
-        onClick={handleExportPPT}
-        className="text-[10px] font-medium bg-orange-500 text-white rounded px-2 py-1.5 hover:bg-orange-600 transition"
-        title="현재 시트 PPT 저장 (다이어그램 + 상세 목록)"
-      >
-        📊 PPT
-      </button>
-      <button
-        onClick={handleExportAllPPT}
-        className="text-[10px] font-medium bg-purple-600 text-white rounded px-2 py-1.5 hover:bg-purple-700 transition"
-        title="전체 시트 PPT 저장 — 시트 1장당 슬라이드 1장 (다이어그램만)"
-      >
-        📋 전체 PPT
-      </button>
-      <button
-        onClick={handleExportExcel}
-        className="text-[10px] font-medium bg-emerald-600 text-white rounded px-2 py-1.5 hover:bg-emerald-700 transition"
-        title={csvRows && csvRows.length > 0 ? "원본 CSV + 전체 시트 수정/추가 내용 통합 (수정=노란색, 추가=초록색)" : "전체 시트 캔버스 노드 내보내기"}
-      >
-        📗 {csvRows && csvRows.length > 0 ? "통합 Excel" : "Excel"}
-      </button>
-      <button
-        onClick={handleExportCanvasExcel}
-        className="text-[10px] font-medium bg-lime-600 text-white rounded px-2 py-1.5 hover:bg-lime-700 transition"
-        title="전체 시트를 각각 별도 워크시트로 내보내기 (원본 CSV 무관, 캔버스 기반)"
-      >
-        📋 전체 시트
-      </button>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] font-bold text-gray-400 mr-1">작업 파일</span>
+        <button onClick={handleSaveJSON} disabled={!hasNodes} className={btn("bg-blue-600 hover:bg-blue-700")} title="지금 상태를 JSON 파일로 저장 (나중에 다시 열어 이어서 작업)">
+          💾 JSON 저장
+        </button>
+        <button onClick={handleLoadJSON} className={btn("bg-gray-500 hover:bg-gray-600")} title="저장한 JSON 파일 열기">
+          📂 JSON 열기
+        </button>
+      </div>
+      <Sep />
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] font-bold text-gray-400 mr-1">PPT</span>
+        <button onClick={handleExportPPT} disabled={!hasNodes} className={btn("bg-orange-500 hover:bg-orange-600")} title="현재 시트만 PPT로 (다이어그램 + 상세 목록)">
+          📊 현재 시트
+        </button>
+        <button onClick={handleExportAllPPT} disabled={!hasNodes} className={btn("bg-purple-600 hover:bg-purple-700")} title="전체 시트 PPT — 시트 1장당 슬라이드 1장 (다이어그램만)">
+          📋 전체 시트
+        </button>
+      </div>
+      <Sep />
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] font-bold text-gray-400 mr-1">Excel</span>
+        <button onClick={handleExportExcel} disabled={!hasNodes} className={btn("bg-emerald-600 hover:bg-emerald-700")} title={csvRows && csvRows.length > 0 ? "원본 데이터 + 전체 시트의 수정/추가 내용을 한 파일로 (수정=노란색, 추가=초록색)" : "전체 시트 캔버스 노드 내보내기"}>
+          📗 {csvRows && csvRows.length > 0 ? "통합(원본+수정)" : "캔버스"}
+        </button>
+        <button onClick={handleExportCanvasExcel} disabled={!hasNodes} className={btn("bg-lime-600 hover:bg-lime-700")} title="시트마다 워크시트 하나씩 (원본 무관, 캔버스 기준)">
+          📋 시트별
+        </button>
+        {xlsxTemplate && (
+          <button onClick={handleExportXlsxTemplate} disabled={!hasNodes} className={btn("bg-teal-600 hover:bg-teal-700")} title="가져온 원본 엑셀 양식 그대로 (서식·병합 유지, ● 도팅 반영)">
+            📊 원본 양식
+          </button>
+        )}
+      </div>
       {process.env.NEXT_PUBLIC_BASE_PATH && (
         <>
-          <a
-            href={DIST_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[10px] font-medium bg-slate-700 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition"
-            title="로컬 설치판(ZIP) 다운로드 — 인트라넷 PC에서 실행할 때. Windows: start.bat / Mac: 시작.command"
-          >
-            ⬇️ 설치판
-          </a>
-          <button
-            onClick={() => {
-              navigator.clipboard?.writeText(DIST_URL).then(
-                () => alert("설치판 링크를 복사했습니다.\n" + DIST_URL),
-                () => prompt("설치판 링크:", DIST_URL),
-              );
-            }}
-            className="text-[10px] font-medium bg-slate-500 text-white rounded px-2 py-1.5 hover:bg-slate-600 transition"
-            title="설치판 다운로드 링크 복사 (메일/위키에 붙여넣기)"
-          >
-            🔗 링크 복사
-          </button>
+          <Sep />
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-bold text-gray-400 mr-1">설치판</span>
+            <a
+              href={DIST_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={btn("bg-slate-700 hover:bg-slate-800")}
+              title="로컬 설치판(ZIP) 다운로드 — 인트라넷 PC에서 실행할 때. Windows: start.bat / Mac: 시작.command"
+            >
+              ⬇️ 내려받기
+            </a>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(DIST_URL).then(
+                  () => alert("설치판 링크를 복사했습니다.\n" + DIST_URL),
+                  () => prompt("설치판 링크:", DIST_URL),
+                );
+              }}
+              className={btn("bg-slate-500 hover:bg-slate-600")}
+              title="설치판 다운로드 링크 복사 (메일/위키에 붙여넣기)"
+            >
+              🔗 링크 복사
+            </button>
+          </div>
         </>
       )}
-      {xlsxTemplate && (
-        <button
-          onClick={handleExportXlsxTemplate}
-          className="text-[10px] font-medium bg-teal-600 text-white rounded px-2 py-1.5 hover:bg-teal-700 transition"
-          title="가져온 원본 엑셀 양식 그대로 내보내기 (서식·병합 유지, ● 도팅 반영)"
-        >
-          📊 원본 양식
-        </button>
-      )}
     </div>
-</>
+    </>
   );
 }

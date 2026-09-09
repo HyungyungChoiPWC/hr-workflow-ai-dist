@@ -36,6 +36,7 @@ export interface ManualItem {
   role: string;
 }
 import {
+  buildTemplateCsvString,
   parseCsv,
   extractL2List,
   extractL3ByL2,
@@ -86,6 +87,7 @@ export default function Home() {
   const [l5Map, setL5Map] = useState<Record<string, L5Item[]>>({});
   const [expandedL4, setExpandedL4] = useState<string | null>(null);
   const [l3PanelCollapsed, setL3PanelCollapsed] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   /* ── Canvas State ──────────────────────────── */
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -867,6 +869,20 @@ export default function Home() {
     [setNodes, setEdges, activeSheetId],
   );
 
+  /* 빈 양식 CSV 내려받기 — 컬럼 구성 + 예시 1행 */
+  const handleDownloadTemplate = useCallback(() => {
+    const header = (buildTemplateCsvString([]).split("\n")[0] || "").replace("두산 L2", "L2 Name"); // 양식은 고객사 표기 없이
+    const cols = header.split(",").length;
+    const example = ["L2-01", "인사관리", "L3-01", "채용", "L4-01", "채용 계획 수립", "연간 채용 계획을 수립한다", "L4-01-01", "부서별 수요 취합", "각 부서 채용 수요를 메일로 받아 정리"];
+    while (example.length < cols) example.push("");
+    const csv = "\uFEFF" + header + "\n" + example.map((v) => (v.includes(",") ? `"${v}"` : v)).join(",") + "\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "AsIs_분석_양식.csv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, []);
+
   const loadCsvText = useCallback(
     (text: string, name: string) => {
       setXlsxTemplate(null); // CSV 로드 시 엑셀 템플릿 해제
@@ -1567,6 +1583,8 @@ export default function Home() {
   /* ═══════════════════════════════════════════════
    * RENDER
    * ═══════════════════════════════════════════════ */
+  const canvasReady = csvRows.length > 0 || nodes.length > 0;
+
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* ═══════════ LEFT PANEL ═══════════ */}
@@ -1577,10 +1595,10 @@ export default function Home() {
             <AppLogo width={44} height={44} />
             <div>
               <h1 className="text-[15px] font-bold text-gray-900 leading-tight">
-                As-Is Workflow Builder
+                프로세스맵 빌더
               </h1>
               <p className="text-[10px] text-gray-400 leading-tight mt-0.5">
-                As-Is Process Workflow Builder
+                As-Is · To-Be 업무 흐름도 작성 도구
               </p>
             </div>
           </div>
@@ -1681,8 +1699,8 @@ export default function Home() {
               </div>
             )}
             {l2List.length === 0 ? (
-              <div className="p-4 text-center text-xs text-gray-400">
-                CSV 파일을 업로드하세요
+              <div className="p-4 text-center text-xs text-gray-400 leading-relaxed">
+                As-Is 분석 엑셀(.xlsx)·CSV 또는<br />저장해 둔 JSON을 위에 올리세요
               </div>
             ) : (
               l2List.map((l2) => (
@@ -1799,47 +1817,9 @@ export default function Home() {
                   }`}
                   title="팔레트 항목 수정/순서변경/삭제 모드"
                 >
-                  {"✏️"}
+                  {"✏️ 팔레트 수정"}
                 </button>
-                <button
-                  onClick={handleRenumberByPosition}
-                  className="text-[10px] font-medium bg-amber-500 text-white rounded px-2 py-1.5 hover:bg-amber-600 transition"
-                  title="캔버스 노드를 x좌표(왼→오) 순서로 ID 재번호"
-                >
-                  {"🔢"}
-                </button>
-                <button
-                  onClick={addDecisionNode}
-                  className="text-[10px] font-medium bg-[#F2A0AF] text-[#3B0716] rounded px-2 py-1.5 hover:bg-[#D95578] hover:text-white transition border border-[#D95578]"
-                  title="판정 로직 (마름모) 노드 추가"
-                >
-                  {"◇"}
-                </button>
-                <button
-                  onClick={addMemoNode}
-                  className="text-[10px] font-medium bg-[#FFF9C4] text-[#6D4C00] rounded px-2 py-1.5 hover:bg-[#FFF176] transition border border-[#FBC02D]"
-                  title="메모 (포스트잇) 추가"
-                >
-                  {"📝"}
-                </button>
-                <button
-                  onClick={handleClearCanvas}
-                  className="text-[10px] font-medium bg-gray-200 text-gray-600 rounded px-2 py-1.5 hover:bg-gray-300 transition"
-                >
-                  {"🗑️"}
-                </button>
-              </div>
-              {/* Export toolbar */}
-              <div className="px-4 py-2 border-b border-gray-100">
-                <ExportToolbar
-                  nodes={nodes}
-                  edges={edges}
-                  sheets={sheets}
-                  getSheetData={getSheetData}
-                  activeSheetId={activeSheetId}
-                  csvRows={csvRows}
-                  xlsxTemplate={xlsxTemplate}
-                />
+                <span className="text-[9px] text-gray-400 self-center">판정·메모·ID 재번호·비우기는 상단 툴바</span>
               </div>
               <div className="flex-1 overflow-y-auto px-2 py-2">
                 {paletteEditMode ? (
@@ -2051,8 +2031,8 @@ export default function Home() {
                         }`}
                       >
                         {expandedL4 === l4.id
-                          ? "▼"
-                          : "▶ " + (l5Map[l4.id] || []).length}
+                          ? "▼ 접기"
+                          : "L5 " + (l5Map[l4.id] || []).length + "개"}
                       </button>
                     </div>
                     {expandedL4 === l4.id && l5Map[l4.id] && (
@@ -2159,25 +2139,12 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              {nodes.length > 0 && (
-                <div className="px-4 py-2 border-t border-gray-100">
-                  <ExportToolbar
-                    nodes={nodes}
-                    edges={edges}
-                    sheets={sheets}
-                    getSheetData={getSheetData}
-                    activeSheetId={activeSheetId}
-                    csvRows={csvRows}
-                    xlsxTemplate={xlsxTemplate}
-                  />
-                </div>
-              )}
             </div>
           )}
         </div>
 
         <div className="p-2 border-t border-gray-100 text-[9px] text-gray-300 text-center">
-          {"As-Is Workflow Builder · " + csvRows.length + "행 로드"}
+          {"프로세스맵 빌더 · " + csvRows.length + "행 로드"}
         </div>
       </div>
 
@@ -2185,6 +2152,26 @@ export default function Home() {
       <div className="flex-1 min-w-0 flex relative overflow-hidden">
         {/* Canvas area + SheetTabBar */}
         <div className="flex-1 min-w-0 flex flex-col relative">
+          {/* ═══ 상단 툴바 — 캔버스 액션 + 저장/내보내기 (항상 보임) ═══ */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 bg-white border-b border-gray-200 shrink-0">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold text-gray-400 mr-1">캔버스</span>
+              <button onClick={addDecisionNode} disabled={!canvasReady} className="text-[11px] font-medium bg-[#F2A0AF] text-[#3B0716] rounded px-2 py-1 hover:bg-[#D95578] hover:text-white transition border border-[#D95578] disabled:opacity-40 disabled:cursor-not-allowed" title="판정 로직(마름모) 노드 추가">◇ 판정 추가</button>
+              <button onClick={addMemoNode} disabled={!canvasReady} className="text-[11px] font-medium bg-[#FFF9C4] text-[#6D4C00] rounded px-2 py-1 hover:bg-[#FFF176] transition border border-[#FBC02D] disabled:opacity-40 disabled:cursor-not-allowed" title="메모(포스트잇) 추가">📝 메모 추가</button>
+              <button onClick={handleRenumberByPosition} disabled={nodes.length === 0} className="text-[11px] font-medium bg-amber-500 text-white rounded px-2 py-1 hover:bg-amber-600 transition disabled:opacity-40 disabled:cursor-not-allowed" title="캔버스 노드를 x좌표(왼→오) 순서로 ID 재번호">🔢 ID 재번호</button>
+              <button onClick={handleClearCanvas} disabled={nodes.length === 0} className="text-[11px] font-medium bg-gray-200 text-gray-600 rounded px-2 py-1 hover:bg-gray-300 transition disabled:opacity-40 disabled:cursor-not-allowed" title="현재 시트의 노드·화살표 전부 삭제">🗑️ 비우기</button>
+            </div>
+            <div className="w-px h-5 bg-gray-200 hidden sm:block" />
+            <ExportToolbar
+              nodes={nodes}
+              edges={edges}
+              sheets={sheets}
+              getSheetData={getSheetData}
+              activeSheetId={activeSheetId}
+              csvRows={csvRows}
+              xlsxTemplate={xlsxTemplate}
+            />
+          </div>
           {/* Canvas */}
           <div className="flex-1 relative" ref={reactFlowWrapper}>
             {csvRows.length === 0 && nodes.length === 0 ? (
@@ -2193,11 +2180,29 @@ export default function Home() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
               >
-                <div className="text-center">
+                <div className="text-center max-w-md">
                   <div className="text-6xl mb-4">📂</div>
-                  <p className="text-lg font-medium">CSV 파일을 업로드하세요</p>
-                  <p className="text-sm mt-1 text-gray-300">
-                    좌측 패널 또는 이 영역에 파일을 드래그하세요
+                  <p className="text-lg font-medium text-gray-500">As-Is 분석 파일을 올리면 시작됩니다</p>
+                  <p className="text-sm mt-1 text-gray-400">
+                    엑셀(.xlsx) · CSV · 이 도구에서 저장한 JSON — 좌측 패널이나 이 영역에 끌어다 놓으세요
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => document.getElementById("csv-upload")?.click()}
+                      className="text-xs font-bold bg-[#A62121] text-white rounded px-3 py-1.5 hover:bg-[#8A1B1B] transition"
+                    >
+                      파일 선택
+                    </button>
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="text-xs font-medium bg-white text-gray-600 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 transition"
+                      title="컬럼 구성이 들어 있는 빈 양식(CSV, 엑셀에서 열림)을 내려받습니다"
+                    >
+                      📄 양식 내려받기
+                    </button>
+                  </div>
+                  <p className="text-[11px] mt-3 text-gray-300">
+                    양식 열: L2 ID·이름 → L3 ID·이름 → L4 ID·이름·설명 → L5 ID·이름·설명 → 수행주체 → 사용 시스템 → Pain Point → Input/Output
                   </p>
                 </div>
               </div>
@@ -2291,45 +2296,31 @@ export default function Home() {
                   }
                 />
                 <Panel key="info" position="top-right">
-                  <div className="bg-white/90 backdrop-blur rounded-lg shadow-sm border border-gray-200 px-3 py-2 text-[10px] text-gray-500 space-y-0.5">
-                    <div>
-                      {"📦 노드: " +
-                        nodes.length +
-                        " · 🔗 엣지: " +
-                        edges.length}
+                  {showHelp ? (
+                    <div className="bg-white/95 backdrop-blur rounded-lg shadow-md border border-gray-200 px-3 py-2 text-[10px] text-gray-500 space-y-0.5 w-56">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-gray-700">사용 팁</span>
+                        <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-700 px-1" title="닫기">✕</button>
+                      </div>
+                      <div>{"📦 노드 " + nodes.length + " · 🔗 화살표 " + edges.length}</div>
+                      <div>{"📋 시트: " + activeSheet.name + (activeSheet.type === "swimlane" ? ` (${activeSheet.lanes?.length || 4}분할)` : " (격자)")}</div>
+                      <div className="border-t border-gray-100 my-1" />
+                      <div>💡 노드 가장자리 점을 드래그 → 화살표 연결</div>
+                      <div>🖱️ 노드 더블클릭 → 메모/메타 편집</div>
+                      <div>🔄 화살표 우클릭 → 양방향 전환</div>
+                      <div>⌫ Delete 키 → 선택 항목 삭제</div>
+                      <div>➕ 좌측 L3 선택 → ‘하위 전체 추가’로 초안 한 번에</div>
+                      <div>💾 새로고침해도 마지막 작업은 자동 복원</div>
                     </div>
-                    <div>
-                      {"📋 시트: " + activeSheet.name + (activeSheet.type === "swimlane" ? ` (${activeSheet.lanes?.length || 4}분할)` : " (격자)")}
-                    </div>
-                    <div>💡 Handle 드래그 → 화살표 연결</div>
-                    <div>🖱️ 노드 더블클릭 → 메모/메타 편집</div>
-                    <div>🔄 화살표 우클릭 → 양방향 전환</div>
-                    <div>⌫ Delete 키로 선택 항목 삭제</div>
+                  ) : (
                     <button
-                      onClick={handleRenumberByPosition}
-                      className="mt-1 w-full text-[10px] font-bold bg-amber-500 text-white rounded px-2 py-1 hover:bg-amber-600 transition"
+                      onClick={() => setShowHelp(true)}
+                      className="w-7 h-7 rounded-full bg-white/90 backdrop-blur shadow border border-gray-200 text-gray-500 text-[12px] font-bold hover:bg-gray-50 hover:text-gray-800"
+                      title={`사용 팁 · 노드 ${nodes.length} · 화살표 ${edges.length}`}
                     >
-                      🔢 ID 재번호 (x좌표 순)
+                      ?
                     </button>
-                    <button
-                      onClick={addDecisionNode}
-                      className="mt-0.5 w-full text-[10px] font-bold bg-[#F2A0AF] text-[#3B0716] rounded px-2 py-1 hover:bg-[#D95578] hover:text-white transition border border-[#D95578]"
-                    >
-                      ◇ 판정 로직 추가
-                    </button>
-                    <button
-                      onClick={addMemoNode}
-                      className="mt-0.5 w-full text-[10px] font-bold bg-[#FFF9C4] text-[#6D4C00] rounded px-2 py-1 hover:bg-[#FFF176] transition border border-[#FBC02D]"
-                    >
-                      📝 메모 추가
-                    </button>
-                    <button
-                      onClick={() => setAddDataMode(true)}
-                      className="mt-0.5 w-full text-[10px] font-bold bg-emerald-500 text-white rounded px-2 py-1 hover:bg-emerald-600 transition"
-                    >
-                      ➕ 데이터 추가 (좌측 패널)
-                    </button>
-                  </div>
+                  )}
                 </Panel>
               </ReactFlow>
 

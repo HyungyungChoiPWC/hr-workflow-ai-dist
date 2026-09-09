@@ -1,5 +1,5 @@
 As-Is Workflow Builder (AX Lens 맵 빌더 설치판)
-version: v2026.09.09-690d9bc
-built:   2026-09-09T09:03:41Z
+version: v2026.09.09-62afaf3
+built:   2026-09-09T09:08:43Z
 web:     https://pwc-ax-lens.com/map
 latest:  https://github.com/HyungyungChoiPWC/hr-workflow-ai-dist/releases/latest/download/hr-workflow-ai.zip
