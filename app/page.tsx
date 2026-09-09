@@ -1066,6 +1066,156 @@ export default function Home() {
     [csvRows]
   );
 
+  /* ═══ 노드 배치 규칙 — 겹치지 않는 다음 자리 ═══
+     기존: 뷰포트 중앙 + 랜덤 오프셋 → 매번 겹쳐서 손으로 떼어내야 했음.
+     변경: L5는 부모 L4 오른쪽에 순서대로, 그 외는 같은 열 맨 아래로. 그래도 겹치면 아래로 밀어냄. */
+  const NODE_W: Record<string, number> = { l2: 720, l3: 650, l4: 580, l5: 300, decision: 220, memo: 220 };
+  const NODE_H: Record<string, number> = { l2: 200, l3: 200, l4: 200, l5: 150, decision: 220, memo: 160 };
+  const GAP_X = 40, GAP_Y = 24;
+  const nodeSize = (n: Node) => ({
+    w: n.measured?.width ?? NODE_W[n.type || "l4"] ?? 300,
+    h: n.measured?.height ?? NODE_H[n.type || "l4"] ?? 110,
+  });
+  const overlapsAny = (x: number, y: number, w: number, h: number, nds: Node[]) =>
+    nds.some((n) => { const sz = nodeSize(n); return !(x + w <= n.position.x || n.position.x + sz.w <= x || y + h <= n.position.y || n.position.y + sz.h <= y); });
+  const viewportCenter = () => {
+    let x = 400, y = 300;
+    if (rfInstanceRef.current) {
+      const vp = rfInstanceRef.current.getViewport();
+      const wrapper = document.querySelector(".react-flow") as HTMLElement | null;
+      if (wrapper) { const rect = wrapper.getBoundingClientRect(); x = (rect.width / 2 - vp.x) / vp.zoom; y = (rect.height / 2 - vp.y) / vp.zoom; }
+    }
+    return { x, y };
+  };
+  const nextFreePosition = (level: string, item: { [key: string]: unknown }, nds: Node[], center: { x: number; y: number }) => {
+    const w = NODE_W[level] ?? 300, h = NODE_H[level] ?? 110;
+    let x: number | undefined, y = 0;
+    if (level === "l5" && item.l4Id) {
+      const parent = nds.find((n) => n.type === "l4" && (n.data as Record<string, unknown>).id === item.l4Id);
+      if (parent) {
+        const ps = nodeSize(parent);
+        x = parent.position.x + ps.w + GAP_X;
+        const px = x;
+        const sibs = nds.filter((n) => n.type === "l5" && Math.abs(n.position.x - px) < 20 && n.position.y >= parent.position.y - 1);
+        y = sibs.length ? Math.max(...sibs.map((n) => n.position.y + nodeSize(n).h)) + GAP_Y / 2 : parent.position.y;
+      }
+    }
+    if (x === undefined) {
+      if (nds.length === 0) { x = center.x - w / 2; y = center.y - h / 2; }
+      else {
+        const same = nds.filter((n) => n.type === level);
+        const ref = same.length ? same[same.length - 1] : nds[nds.length - 1];
+        x = ref.position.x;
+        const cx = x;
+        const col = nds.filter((n) => Math.abs(n.position.x - cx) < w / 2);
+        const pool = col.length ? col : nds;
+        y = Math.max(...pool.map((n) => n.position.y + nodeSize(n).h)) + GAP_Y;
+      }
+    }
+    let guard = 0;
+    while (overlapsAny(x, y, w, h, nds) && guard++ < 300) y += GAP_Y;
+    return { x, y };
+  };
+
+  /* 렌더 직후 실측 크기로 한 번 더 정리 — 추정 높이와 실제가 달라 겹치는 경우 대비 */
+  const settleNodes = (ids: string[]) => {
+    setTimeout(() => {
+      setNodes((nds) => {
+        const out = nds.map((n) => ({ ...n, position: { ...n.position } }));
+        for (const id of ids) {
+          const me = out.find((n) => n.id === id);
+          if (!me) continue;
+          const sz = nodeSize(me);
+          const others = out.filter((n) => n.id !== id);
+          let guard = 0;
+          while (overlapsAny(me.position.x, me.position.y, sz.w, sz.h, others) && guard++ < 300) me.position.y += GAP_Y;
+        }
+        return out;
+      });
+    }, 150);
+  };
+  const settleRows = (rows: { l4: string; l5s: string[] }[]) => {
+    setTimeout(() => {
+      setNodes((nds) => {
+        const out = nds.map((n) => ({ ...n, position: { ...n.position } }));
+        const byId = new Map(out.map((n) => [n.id, n]));
+        let top = Number.NaN;
+        for (const r of rows) {
+          const l4 = byId.get(r.l4);
+          if (!l4) continue;
+          if (Number.isNaN(top)) top = l4.position.y;
+          l4.position.y = top;
+          let y: number = top;
+          for (const id of r.l5s) {
+            const n5 = byId.get(id);
+            if (!n5) continue;
+            n5.position.y = y;
+            y += nodeSize(n5).h + 12;
+          }
+          top = Math.max(top + nodeSize(l4).h, y) + GAP_Y * 1.5;
+        }
+        return out;
+      });
+      setTimeout(() => rfInstanceRef.current?.fitView({ padding: 0.1, maxZoom: 1.2, duration: 300 }), 50);
+    }, 150);
+  };
+
+  /* ═══ 하위 전체 추가 — 선택한 L3의 L4·L5를 한 번에 배치 + 순서대로 연결 ═══
+     인트라넷 설치판에는 AI 챗이 없어서 초안 작성 속도가 여기서 결정된다. */
+  const mkEdge = (source: string, target: string, toL5: boolean): Edge => ({
+    id: `e-${source}-${target}`,
+    source, target, type: "ortho", animated: false,
+    sourceHandle: toL5 ? "right" : "bottom",
+    targetHandle: toL5 ? "t-left" : "t-top",
+    style: { stroke: toL5 ? "#555555" : "#000000", strokeWidth: 1.5 },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: toL5 ? "#555555" : "#000000" },
+  });
+  const addL3SubtreeToCanvas = useCallback(() => {
+    if (l4List.length === 0) return;
+    const center = viewportCenter();
+    const existing = nodes;
+    const has = (type: string, id: string) => existing.find((n) => n.type === type && (n.data as Record<string, unknown>).id === id);
+    const newNodes: Node[] = [];
+    const newEdges: Edge[] = [];
+    const rows: { l4: string; l5s: string[] }[] = [];
+    const l4X = existing.some((n) => n.type === "l4")
+      ? Math.min(...existing.filter((n) => n.type === "l4").map((n) => n.position.x))
+      : center.x - NODE_W.l4 / 2;
+    let yCursor = existing.length ? Math.max(...existing.map((n) => n.position.y + nodeSize(n).h)) + GAP_Y * 2 : center.y - NODE_H.l4 / 2;
+    let prevL4Id: string | null = null;
+    for (const l4 of l4List) {
+      let l4Node = has("l4", l4.id);
+      const l5s = l5Map[l4.id] || [];
+      if (!l4Node) {
+        l4Node = createNodeFromItem("l4", { ...l4 }, { x: l4X, y: yCursor });
+        newNodes.push(l4Node);
+      }
+      const baseY = l4Node.position.y;
+      const l5X = l4Node.position.x + NODE_W.l4 + GAP_X;
+      const row = { l4: l4Node.id, l5s: [] as string[] };
+      let j = 0;
+      for (const l5 of l5s) {
+        const ex = has("l5", l5.id);
+        if (ex) { row.l5s.push(ex.id); continue; }
+        const n5 = createNodeFromItem("l5", { ...l5, l4Name: l4.name }, { x: l5X, y: baseY + j * (NODE_H.l5 + 12) });
+        newNodes.push(n5);
+        newEdges.push(mkEdge(l4Node.id, n5.id, true));
+        row.l5s.push(n5.id);
+        j++;
+      }
+      rows.push(row);
+      if (prevL4Id) newEdges.push(mkEdge(prevL4Id, l4Node.id, false));
+      prevL4Id = l4Node.id;
+      const rowH = Math.max(NODE_H.l4, l5s.length * (NODE_H.l5 + 12));
+      if (!has("l4", l4.id) || newNodes.includes(l4Node)) yCursor = baseY + rowH + GAP_Y * 1.5;
+    }
+    if (newNodes.length === 0) { alert("이미 캔버스에 모두 추가돼 있습니다."); return; }
+    nodeCountRef.current += newNodes.length;
+    setNodes((nds) => [...nds, ...newNodes]);
+    setEdges((eds) => [...eds, ...newEdges.filter((e) => !eds.some((x) => x.id === e.id))]);
+    settleRows(rows);
+  }, [l4List, l5Map, nodes, setNodes, setEdges]);
+
   /* ═══ Add node to canvas (click) — place at viewport center ═══ */
   const addNodeToCanvas = useCallback(
     (
@@ -1073,25 +1223,15 @@ export default function Home() {
       item: { id: string; name: string; description?: string; [key: string]: unknown }
     ) => {
       nodeCountRef.current++;
-      // Get current viewport center in flow coordinates
-      let x = 400, y = 300;
-      if (rfInstanceRef.current) {
-        const vp = rfInstanceRef.current.getViewport();
-        const wrapper = document.querySelector('.react-flow') as HTMLElement;
-        if (wrapper) {
-          const rect = wrapper.getBoundingClientRect();
-          // Convert screen center → flow coordinates
-          x = (rect.width / 2 - vp.x) / vp.zoom;
-          y = (rect.height / 2 - vp.y) / vp.zoom;
-        }
-      }
-      // Small random offset so stacked nodes don't overlap exactly
-      x += (Math.random() - 0.5) * 80;
-      y += (Math.random() - 0.5) * 60;
-      const node = createNodeFromItem(level, item, { x, y });
+      const center = viewportCenter();
+      let newId = "";
       setNodes((nds) => {
+        const pos = nextFreePosition(level, item, nds, center);
+        const node = createNodeFromItem(level, item, pos);
+        newId = node.id;
         return [...nds, node];
       });
+      setTimeout(() => { if (newId) settleNodes([newId]); }, 0);
     },
     [setNodes]
   );
@@ -1863,6 +2003,15 @@ export default function Home() {
                 ) : (
                   /* ═══ NORMAL MODE ═══ */
                   <>
+                {filteredL4.length > 0 && (
+                  <button
+                    onClick={addL3SubtreeToCanvas}
+                    className="mb-1.5 w-full rounded-md bg-[#A62121] px-2 py-1.5 text-[11px] font-bold text-white hover:bg-[#8A1B1B] transition-colors"
+                    title="이 L3의 L4·L5를 한 번에 캔버스에 배치하고 순서대로 연결합니다 (이미 있는 항목은 건너뜀)"
+                  >
+                    ➕ 하위 전체 추가 (L4 {l4List.length} · L5 {l4List.reduce((n, l4) => n + (l5Map[l4.id]?.length || 0), 0)})
+                  </button>
+                )}
                 <p className="text-[9px] text-gray-400 px-2 mb-1">
                   💡 항목 클릭 → 캔버스 추가 · Handle 드래그 → 화살표 연결
                 </p>

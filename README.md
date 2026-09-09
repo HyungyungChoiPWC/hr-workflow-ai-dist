@@ -4,7 +4,7 @@ AX Lens 맵 빌더의 로컬 실행 버전입니다. **최신 설치판 다운�
 
 👉 https://github.com/HyungyungChoiPWC/hr-workflow-ai-dist/releases/latest/download/hr-workflow-ai.zip
 
-(이 저장소의 Code → Download ZIP 도 같은 내용입니다. 버전: v2026.09.09-43eb7b0, 웹 버전: https://pwc-ax-lens.com/map)
+(이 저장소의 Code → Download ZIP 도 같은 내용입니다. 버전: v2026.09.09-690d9bc, 웹 버전: https://pwc-ax-lens.com/map)
 
 ---
 
