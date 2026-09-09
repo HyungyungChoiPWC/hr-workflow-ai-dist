@@ -946,6 +946,87 @@ export default function Home() {
     [loadCsvText, loadJsonText, loadXlsxBuffer],
   );
 
+  /* ═══ 자동저장 (localStorage) + 복원 + 닫기 경고 ═══
+     새로고침·탭 닫기로 작업이 통째로 날아가던 문제 대응. JSON 저장(v2.0)과 같은 형식으로
+     1.5초 디바운스 저장, 다음 방문 때 복원 배너. 팔레트(csvRows)까지 같이 저장한다. */
+  const AUTOSAVE_KEY = "hrwf:autosave:v2";
+  const [autosavedAt, setAutosavedAt] = useState<string>("");
+  const [restoreCandidate, setRestoreCandidate] = useState<{ savedAt: string; fileName?: string; sheetCount: number; nodeCount: number } | null>(null);
+  const restoreCheckedRef = useRef(false);
+
+  const buildSnapshot = useCallback(() => {
+    const sheetPayloads = sheets.map((s) => {
+      const sd = s.id === activeSheetId ? { nodes, edges } : (sheetDataRef.current[s.id] || { nodes: [], edges: [] });
+      return { id: s.id, name: s.name, type: s.type, lanes: s.lanes, laneHeights: s.laneHeights, variant: s.variant, nodes: sd.nodes, edges: sd.edges };
+    });
+    return { version: "2.0", savedAt: new Date().toISOString(), fileName, csvRows, sheets: sheetPayloads };
+  }, [sheets, activeSheetId, nodes, edges, fileName, csvRows]);
+
+  const hasWork =
+    nodes.length > 0 || csvRows.length > 0 || sheets.length > 1 ||
+    Object.values(sheetDataRef.current).some((d) => (d?.nodes?.length ?? 0) > 0);
+
+  /* 최초 1회: 복원 후보 확인 */
+  useEffect(() => {
+    if (restoreCheckedRef.current) return;
+    restoreCheckedRef.current = true;
+    try {
+      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) return;
+      const snap = JSON.parse(raw) as { savedAt: string; fileName?: string; csvRows?: unknown[]; sheets?: { nodes?: unknown[] }[] };
+      const nodeCount = (snap.sheets || []).reduce((n, sh) => n + (sh.nodes?.length || 0), 0);
+      const rows = snap.csvRows?.length || 0;
+      if (nodeCount === 0 && rows === 0) return;
+      setRestoreCandidate({ savedAt: snap.savedAt, fileName: snap.fileName, sheetCount: (snap.sheets || []).length, nodeCount });
+    } catch { /* 저장소 접근 불가 — 무시 */ }
+  }, []);
+
+  /* 디바운스 자동저장 (복원 여부를 결정하기 전에는 덮어쓰지 않음) */
+  useEffect(() => {
+    if (!restoreCheckedRef.current || restoreCandidate || !hasWork) return;
+    const t = setTimeout(() => {
+      try {
+        const snap = buildSnapshot();
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(snap));
+        setAutosavedAt(snap.savedAt);
+      } catch { /* quota 초과 등 — 무시 */ }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [buildSnapshot, hasWork, restoreCandidate]);
+
+  const handleRestore = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) { setRestoreCandidate(null); return; }
+      const snap = JSON.parse(raw) as { fileName?: string; csvRows?: CsvRow[]; sheets?: unknown[] };
+      if (snap.csvRows && snap.csvRows.length > 0) applyRows(snap.csvRows, snap.fileName || "복원된 작업");
+      setTimeout(() => {
+        if (snap.sheets && snap.sheets.length > 0) {
+          window.dispatchEvent(new CustomEvent("loadWorkflow", { detail: { sheets: snap.sheets } }));
+        }
+        if (snap.fileName) setFileName(snap.fileName);
+      }, 50);
+      setRestoreCandidate(null);
+    } catch {
+      alert("이전 작업을 복원하지 못했습니다.");
+      setRestoreCandidate(null);
+    }
+  }, [applyRows]);
+
+  const handleDiscardRestore = useCallback(() => {
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch { /* ignore */ }
+    setRestoreCandidate(null);
+  }, []);
+
+  /* 닫기·새로고침 경고 */
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => {
+      if (hasWork) { e.preventDefault(); e.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [hasWork]);
+
   /* ── File Upload ───────────────────────────── */
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2128,6 +2209,23 @@ export default function Home() {
           />
         </div>
 
+        {/* 자동저장 복원 배너 */}
+        {restoreCandidate && (
+          <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 shadow-lg flex items-center gap-3 text-[12px] text-amber-900">
+            <span>
+              💾 이전 작업이 자동 저장돼 있습니다
+              {restoreCandidate.fileName ? ` — ${restoreCandidate.fileName}` : ""} · 시트 {restoreCandidate.sheetCount}개 · 노드 {restoreCandidate.nodeCount}개
+              · {new Date(restoreCandidate.savedAt).toLocaleString("ko-KR", { hour12: false })}
+            </span>
+            <button onClick={handleRestore} className="rounded bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-700">복원</button>
+            <button onClick={handleDiscardRestore} className="rounded border border-amber-300 px-2.5 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100">삭제</button>
+          </div>
+        )}
+        {autosavedAt && !restoreCandidate && (
+          <div className="fixed bottom-2 right-3 z-40 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-400 border border-gray-200" title="브라우저에 자동 저장됨 (새로고침·재방문 시 복원 가능). 다른 PC로 옮기려면 JSON 저장을 쓰세요.">
+            자동저장 {new Date(autosavedAt).toLocaleTimeString("ko-KR", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+          </div>
+        )}
         {/* Chat Panel — 웹 편입판에서만 (로컬 설치판은 백엔드가 없어 AI 챗 비활성) */}
         {process.env.NEXT_PUBLIC_BASE_PATH && (
           <ChatPanel
