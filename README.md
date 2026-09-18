@@ -4,13 +4,17 @@ AX Lens 맵 빌더의 로컬 실행 버전입니다. **최신 설치판 다운�
 
 👉 https://github.com/HyungyungChoiPWC/hr-workflow-ai-dist/releases/latest/download/hr-workflow-ai.zip
 
-(이 저장소의 Code → Download ZIP 도 같은 내용입니다. 버전: v2026.09.09-62afaf3, 웹 버전: https://pwc-ax-lens.com/map)
+(이 저장소의 Code → Download ZIP 도 같은 내용입니다. 버전: v2026.09.18-91b7084, 웹 버전: https://pwc-ax-lens.com/map)
 
 ---
 
 # 📋 As-Is Workflow Builder
 
 > **As-is 프로세스 워크플로우 빌더**
+
+이 문서는 다운로드 설치판 기준입니다. 설치판에는 AI 챗과 AI 워크플로우 생성 기능이 없으며, API 키 입력이나 온라인 프로젝트 연결도 필요하지 않습니다. 맵 편집·JSON 저장/불러오기·PPT/Excel 내보내기를 내 PC에서 사용할 수 있습니다.
+
+최초 설치 시 Node.js와 라이브러리를 내려받아야 하므로 인터넷 연결이 필요합니다. 완전 오프라인 설치 패키지는 아닙니다.
 
 ---
 
@@ -81,7 +85,7 @@ node -v
 
 **첫 번째** — 프로젝트 다운로드:
 ```
-git clone https://github.com/jsjong98/hr-workflow-ai.git
+git clone https://github.com/HyungyungChoiPWC/hr-workflow-ai-dist.git hr-workflow-ai
 ```
 
 **두 번째** — 폴더로 이동:
@@ -215,20 +219,6 @@ npm run dev
 
 ---
 
-## 🔑 AI 기능 사용 (선택사항)
-
-AI 워크플로우 생성 기능을 사용하려면 **OpenAI API Key**가 필요합니다.
-
-프로젝트 폴더에 `.env.local` 파일을 생성하고 아래 내용을 입력:
-
-```
-OPENAI_API_KEY=sk-xxxx...
-```
-
-> API Key 없이도 CSV 업로드, 노드 편집, PPT/Excel 내보내기 등 대부분의 기능을 사용할 수 있습니다.
-
----
-
 ## 📖 주요 기능
 
 | 기능 | 설명 |
@@ -241,7 +231,6 @@ OPENAI_API_KEY=sk-xxxx...
 | **노드 메타데이터 편집** | 노드 더블클릭 → 수행주체·I/O·사용시스템·관리주체 등 상세 정보 입력 |
 | **사용 시스템 태그** | L5 노드 하단에 HR시스템·그룹웨어·오피스·수작업·기타툴 태그 자동 표시 |
 | **다중 시트** | 시트 탭 추가·삭제·복제·이름변경 |
-| **AI Workflow** | 🤖 버튼 → AI가 자동으로 워크플로우 생성 |
 | **💾 JSON 저장/불러오기** | 전체 시트(노드·엣지·레이아웃) JSON으로 저장 후 재편집 가능 |
 | **📊 PPT 내보내기** | 현재 시트를 다이어그램·순서·연결목록·노드상세 포함 PPT로 저장 |
 | **📋 전체 PPT 내보내기** | 모든 시트를 1장씩 다이어그램 슬라이드로 묶어 저장 (사용 시스템 태그 포함) |

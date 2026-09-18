@@ -20,7 +20,6 @@ import "@xyflow/react/dist/style.css";
 
 import { L2Node, L3Node, L4Node, L5Node, DecisionNode, MemoNode } from "@/components/LevelNode";
 import OrthoEdge from "@/components/OrthoEdge";
-import ChatPanel from "@/components/ChatPanel";
 import ExportToolbar from "@/components/ExportToolbar";
 import NodeDetailPanel, { type NodeMeta } from "@/components/NodeDetailPanel";
 import SheetTabBar, { type Sheet, type SheetType } from "@/components/SheetTabBar";
@@ -424,9 +423,6 @@ export default function Home() {
     []
   );
 
-  /* ── Chat Panel ────────────────────────────── */
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatInitData, setChatInitData] = useState<string>("");
 
   /* ── Node Detail Panel ─────────────────────── */
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -1500,15 +1496,6 @@ export default function Home() {
     nodeCountRef.current = 0;
   }, [setNodes, setEdges]);
 
-  /* ═══ Apply workflow from Chat AI ═══ */
-  const handleApplyWorkflow = useCallback(
-    (newNodes: Node[], newEdges: Edge[]) => {
-      setNodes(newNodes);
-      setEdges(newEdges);
-      nodeCountRef.current = newNodes.length;
-    },
-    [setNodes, setEdges]
-  );
 
   /* ═══ Listen for JSON load events (from ExportToolbar) ═══ */
   useEffect(() => {
@@ -2365,18 +2352,6 @@ export default function Home() {
           <div className="fixed bottom-2 right-3 z-40 rounded bg-white/90 px-2 py-0.5 text-[10px] text-gray-400 border border-gray-200" title="브라우저에 자동 저장됨 (새로고침·재방문 시 복원 가능). 다른 PC로 옮기려면 JSON 저장을 쓰세요.">
             자동저장 {new Date(autosavedAt).toLocaleTimeString("ko-KR", { hour12: false, hour: "2-digit", minute: "2-digit" })}
           </div>
-        )}
-        {/* Chat Panel — 웹 편입판에서만 (로컬 설치판은 백엔드가 없어 AI 챗 비활성) */}
-        {process.env.NEXT_PUBLIC_BASE_PATH && (
-          <ChatPanel
-            nodes={nodes}
-            edges={edges}
-            onApplyWorkflow={handleApplyWorkflow}
-            isOpen={chatOpen}
-            onToggle={() => setChatOpen(!chatOpen)}
-            processData={chatInitData}
-            onProcessDataConsumed={() => setChatInitData("")}
-          />
         )}
       </div>
 
